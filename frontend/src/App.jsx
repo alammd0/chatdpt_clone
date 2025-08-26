@@ -6,7 +6,7 @@ function App() {
 
   return (
     <>
-      <div className="bg-[#212121] min-h-screen text-white">
+      <div className="bg-[#212121] min-h-screen text-white p-4">
           <AppBar />
           <Chat />
       </div>

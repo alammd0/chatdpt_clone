@@ -1,16 +1,25 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 export default function Chat() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [code, setCode] = useState(false);
+
+  const conversationId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  // console.log(conversationId);
+
+  // const userId = Math.random().toString(36).substring(2, 15);
 
   const handleSubmit = async () => {
     if (message.trim() === "") {
       return;
     }
 
-    const newMessage = { sender: "you", text: message };
+    const newMessage = { sender: "user", text: message };
     setChat((prev) => [...prev, newMessage]);
     setMessage("");
 
@@ -23,11 +32,14 @@ export default function Chat() {
         },
         body: JSON.stringify({
           message: message,
+          conversationId: conversationId,
         }),
       });
 
       const backendResponse = await response.json();
-      const aiMessage = { sender: "ai", text: backendResponse.message };
+      console.log(backendResponse);
+
+      const aiMessage = { sender: "assistant", text: backendResponse.message };
       setChat((prev) => [...prev, aiMessage]);
       setIsLoading(false);
     } catch (error) {
@@ -36,8 +48,6 @@ export default function Chat() {
     }
   };
 
-  console.log(chat);
-
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       handleSubmit(e);
@@ -45,6 +55,14 @@ export default function Chat() {
 
     console.log(e.key);
   };
+
+  const handleClickCopy = (code) => {
+     navigator.clipboard.writeText(code)
+     .then( () => {
+       setCode(true);
+       setTimeout( () => setCode(false), 2000);
+     })
+  }
 
   return (
     <div className="max-w-8/12 mx-auto w-full flex flex-col justify-between">
@@ -57,44 +75,60 @@ export default function Chat() {
             }`}
           >
             <div
-              className={`p-3 rounded-xl max-w-8/12 ${
+              className={`p-3 rounded-xl  ${
                 mes.sender !== "you"
-                  ? "my-2 bg-[#2c2c2c] text-white"
+                  ? ""
                   : "my-2 bg-gray-700 text-white"
               }`}
             >
-              {mes.text}
+              {
+                mes.sender === "you" ? (
+                  <p className="my-2 bg-gray-700 text-white flex justify-end">{mes.text}</p>
+                ) : (
+                  <div class="p-4 rounded-lg w-full">
+                       <ReactMarkdown
+                          children={mes.text}
+                          components={{
+                            code({ node, inline, className, children, ...props }) {
+                              const match = /language-(\w+)/.exec(className || "");
+                              const codeString= String(children).replace(/\n$/, "");
+                              return !inline && match ? (
+                                  <div className="relative group">
+                                      <button className="absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded hover:bg-gray-600" onClick={() => handleClickCopy(codeString)}>
+                                        {code ? "Copied!" : "Copy"}
+                                      </button>
+                                      <SyntaxHighlighter
+                                          style={oneDark}
+                                          language={match[1]}
+                                          PreTag="div"
+                                          {...props}
+                                        >
+                                          {codeString}
+                                      </SyntaxHighlighter>
+                                  </div>
+                              ) : (
+                               
+                                   <code className="bg-gray-800 px-1 rounded" {...props}>
+                                      {children}
+                                    </code>
+                                
+                              );
+                            }
+                          }}
+                        />
+                  </div>
+                )
+              }
             </div>
           </div>
         ))}
 
         {/* Loading spinner should not replace chat */}
         {isLoading && (
-          <div className="flex justify-start items-center my-2">
-            <svg
-              className="animate-spin h-6 w-6 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 
-                    0 12h4zm2 5.291A7.962 7.962 0 014 
-                    12H0c0 3.042 1.135 5.824 
-                    3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            <span className="ml-2 text-gray-300">AI is typing...</span>
+          <div className="flex items-center space-x-2 text-gray-300">
+              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-300"></span>
           </div>
         )}
       </div>
