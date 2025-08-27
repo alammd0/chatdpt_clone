@@ -13,13 +13,17 @@ model User {
   password  String
   name      String
   message   Message[]
+  conversation ConversationalMessage[]
   createdAt DateTime  @default(now())
 }
 
 model ConversationalMessage {
   id      String    @id @default(cuid())
   text    String
+  userId  String
+  user    User      @relation(fields: [userId], references: [id])
   message Message[]
+  createdAt DateTime  @default(now())
 }
 
 model Message {

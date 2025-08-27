@@ -8,8 +8,8 @@ dotenv.config();
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const tvly = tavily({ apiKey: process.env.TAVILY_API_KEY });
 
-export async function main(userMessage, conversationId) {
-  
+export async function main(userMessage, conversationId = null , userId = null) {
+
   const systemPrompt = [
     {
       role: "system",
@@ -65,11 +65,34 @@ export async function main(userMessage, conversationId) {
     },
   ];
 
-  const message = [
-    ...systemPrompt,
-    ...formattedPreviousMessages,
-    { role: "user", content: userMessage },
-  ];
+  // Load previous messages from the database
+  let formattedPreviousMessages = [];
+  if (conversationId){
+     try {
+
+      const previousMessages = await prisma.message.findMany({
+        where : {
+          conversationalMessageId : conversationId
+        },
+        orderBy : {
+          createdAt : "asc"
+        }
+      });
+
+      formattedPreviousMessages = previousMessages.map( (m) => {
+        const role = m.sender === "user" ? "user" : m.sender === "assistant" ? "assistant" : "system";
+
+        return {role, content : m.text};
+      });
+     }
+     catch(error){
+       console.log("fail to load previous message...")
+     }
+  }
+
+  const message = [systemPrompt, ...formattedPreviousMessages, {role : "user", content : userMessage}]
+
+  //  const MAX_TOOL_ITERATIONS = 3;
 
   while (true) {
     const completions = await groq.chat.completions.create({
@@ -99,14 +122,44 @@ export async function main(userMessage, conversationId) {
       tool_choice: "auto",
     });
 
-    message.push(completions.choices[0].message);
+    // message.push(completions.choices[0].message);
 
-    const toolCalls = completions.choices[0].message.tool_calls;
+    
+    // const toolCalls = completions.choices[0].message.tool_calls;
+    // if (!toolCalls) {
+    //    const aiMessage = completions.choices[0].message.content;
+    //    return aiMessage;
+    // }
 
-    if (!toolCalls) {
-       const aiMessage = completions.choices[0].message.content;
-       return aiMessage;
+    const choiceMsg = completions.choices[0]?.message ; 
+    if(!choiceMsg){
+      return "Sorry — no response from model."
     }
+
+
+    const toolCalls = choiceMsg.tool_calls;
+
+    if(!toolCalls || toolCalls.length === 0){
+       const AIMessage = choiceMsg.content || ""
+      //  TODO : Check Points 
+       if(conversationId && user){
+        try{
+          await prisma.message.create({
+            data : {
+              text : AIMessage,
+              sender : "assistant",
+              conversationalMessageId : conversationId,
+              userId : user.id
+            }
+          })
+        }
+        catch(error){
+          console.log("Failed to save Assistant message : ", error)
+        }
+       }
+       return AIMessage;
+    }
+
 
     for (const toolCall of toolCalls) {
       const functionName = toolCall.function.name;
