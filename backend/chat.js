@@ -69,7 +69,6 @@ export async function main(userMessage, conversationId = null , userId = null) {
   let formattedPreviousMessages = [];
   if (conversationId){
      try {
-
       const previousMessages = await prisma.message.findMany({
         where : {
           conversationalMessageId : conversationId
@@ -81,7 +80,7 @@ export async function main(userMessage, conversationId = null , userId = null) {
 
       formattedPreviousMessages = previousMessages.map( (m) => {
         const role = m.sender === "user" ? "user" : m.sender === "assistant" ? "assistant" : "system";
-
+        
         return {role, content : m.text};
       });
      }

@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/v1/auth", userRouter);
-app.use("/api/v1/chat", chatRouter);
+app.use("/api/v1/c", chatRouter);
 
 app.get('/', (req, res) => {
   res.send('Hello World!');
